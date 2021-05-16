@@ -4,7 +4,8 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "scratch": "ts-node scratch.ts"
+    "scratch": "ts-node scratch.ts",
+    "test": "jest"
   },
   "repository": {
     "type": "git",
@@ -18,11 +19,17 @@
   },
   "homepage": "https://github.com/seikichi/hackvm2wasm#readme",
   "devDependencies": {
+    "@types/jest": "^26.0.23",
     "@types/node": "^15.3.0",
+    "jest": "^26.6.3",
+    "ts-jest": "^26.5.6",
     "ts-node": "^9.1.1",
     "typescript": "^4.2.4"
   },
   "dependencies": {
     "binaryen": "^101.0.0"
+  },
+  "jest": {
+    "preset": "ts-jest"
   }
 }
