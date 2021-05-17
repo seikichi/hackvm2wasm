@@ -112,3 +112,48 @@ test("local and argument", () => {
   const e = instance.exports as any;
   expect(e.test(1, 20)).toBe(42);
 });
+
+test("pointer, this, that", () => {
+  const commands = parse(`
+    function test 0
+      push constant 3030
+      pop pointer 0
+      push constant 3040
+      pop pointer 1
+      push constant 32
+      pop this 2
+      push constant 46
+      pop that 6
+      push pointer 0
+      push pointer 1
+      add
+      push this 2
+      sub
+      push that 6
+      add
+      return
+    `);
+
+  const m = new binaryen.Module();
+
+  // FIXME: Move the following code to compiler.ts
+  m.addMemoryImport("0", "js", "mem");
+  const mem = new WebAssembly.Memory({ initial: 2, maximum: 2 });
+  const imports = { js: { mem } };
+
+  compile(m, commands);
+
+  expect(m.validate).toBeTruthy();
+
+  const wasm = m.emitBinary();
+  const compiled = new WebAssembly.Module(wasm);
+  const instance = new WebAssembly.Instance(compiled, imports);
+
+  const e = instance.exports as any;
+  expect(e.test()).toBe(6084);
+
+  const buf = new Int32Array(mem.buffer);
+  expect(buf.length).toBe(32768);
+  expect(buf[3032]).toBe(32);
+  expect(buf[3046]).toBe(46);
+});
