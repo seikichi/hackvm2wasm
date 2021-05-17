@@ -76,3 +76,39 @@ test("simple arithmetic", () => {
   const e = instance.exports as any;
   expect(e.test()).toBe(-91);
 });
+
+test("local and argument", () => {
+  const commands = parse(`
+    function test 1
+      // local[0] = argument[0] + argument[1]
+      push argument 0
+      push argument 1
+      add
+      pop local 0
+
+      // argument[0] = local[0]
+      // argument[1] = local[0]
+      push local 0
+      pop argument 0
+      push local 0
+      pop argument 1
+
+      // argument[0] + argument[1]
+      push argument 0
+      push argument 1
+      add
+      return
+    `);
+
+  const m = new binaryen.Module();
+  compile(m, commands);
+
+  expect(m.validate).toBeTruthy();
+
+  const wasm = m.emitBinary();
+  const compiled = new WebAssembly.Module(wasm);
+  const instance = new WebAssembly.Instance(compiled, {});
+
+  const e = instance.exports as any;
+  expect(e.test(1, 20)).toBe(42);
+});
