@@ -21,21 +21,59 @@ export function compile(m: Module, fn: Command[]) {
         }
         exprs.push(m.i32.const(c.args[1]));
         continue;
-      case "add":
-        if (exprs.length < 2) {
-          throw `Invalid Command: ${JSON.stringify(c)}`;
-        }
-        const lhs = exprs.pop()!;
-        const rhs = exprs.pop()!;
-        exprs.push(m.i32.add(lhs, rhs));
-        continue;
-      case "return":
+      case "neg": {
         if (exprs.length < 1) {
           throw `Invalid Command: ${JSON.stringify(c)}`;
         }
-        const ret = exprs.pop();
+        const ret = exprs.pop()!;
+        exprs.push(m.i32.sub(m.i32.const(0), ret));
+        continue;
+      }
+      case "not": {
+        if (exprs.length < 1) {
+          throw `Invalid Command: ${JSON.stringify(c)}`;
+        }
+        const ret = exprs.pop()!;
+        exprs.push(m.i32.xor(ret, m.i32.const(-1)));
+        continue;
+      }
+      case "add":
+      case "sub":
+      case "eq":
+      case "gt":
+      case "lt":
+      case "and":
+      case "or": {
+        if (exprs.length < 2) {
+          throw `Invalid Command: ${JSON.stringify(c)}`;
+        }
+        const operations = {
+          add: m.i32.add,
+          sub: m.i32.sub,
+          eq: m.i32.eq,
+          gt: m.i32.gt_s,
+          lt: m.i32.lt_s,
+          and: m.i32.and,
+          or: m.i32.or,
+        };
+        const rhs = exprs.pop()!;
+        const lhs = exprs.pop()!;
+        exprs.push(operations[c.type](lhs, rhs));
+
+        if (c.type === "eq" || c.type === "lt" || c.type === "gt") {
+          const e = exprs.pop()!;
+          exprs.push(m.select(e, m.i32.const(-1), m.i32.const(0)));
+        }
+        continue;
+      }
+      case "return": {
+        if (exprs.length < 1) {
+          throw `Invalid Command: ${JSON.stringify(c)}`;
+        }
+        const ret = exprs.pop()!;
         exprs.push(m.return(ret));
         continue;
+      }
       default:
         throw `Unimplemented Command: ${JSON.stringify(c)}`;
     }
