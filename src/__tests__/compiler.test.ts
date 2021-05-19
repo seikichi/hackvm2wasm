@@ -222,3 +222,89 @@ test("static", () => {
   const e = instance.exports as any;
   expect(e.test()).toBe(42);
 });
+
+test("simple function", () => {
+  const commands = parse(`
+    function f1 0
+      push argument 0
+      push argument 1
+      add
+      return
+
+    function f2 0
+      push argument 0
+      push argument 1
+      call f1 2
+      return
+
+    function test 0
+      push constant 1
+      push constant 41
+      call f2 2
+      return
+    `);
+
+  const mem = new WebAssembly.Memory({ initial: 2, maximum: 2 });
+  const imports = { js: { mem } };
+
+  const m = compile(commands);
+
+  const wasm = m.emitBinary();
+  const compiled = new WebAssembly.Module(wasm);
+  const instance = new WebAssembly.Instance(compiled, imports);
+
+  const e = instance.exports as any;
+  expect(e.test()).toBe(42);
+});
+
+xtest("multiple static", () => {
+  const class1 = parse(`
+    function Class1.set 0
+    push argument 0
+    pop static 0
+    push argument 1
+    pop static 1
+    push constant 0
+    return
+
+    // Returns static[0] - static[1].
+    function Class1.get 0
+    push static 0
+    push static 1
+    sub
+    return
+  `);
+  const class2 = parse(`
+    function Class2.set 0
+    push argument 0
+    pop static 0
+    push argument 1
+    pop static 1
+    push constant 0
+    return
+
+    // Returns static[0] - static[1].
+    function Class2.get 0
+    push static 0
+    push static 1
+    sub
+    return
+  `);
+  const sys = parse(`
+    function Sys.init 0
+    push constant 6
+    push constant 8
+    call Class1.set 2
+    pop temp 0 // Dumps the return value
+    push constant 23
+    push constant 15
+    call Class2.set 2
+    pop temp 0 // Dumps the return value
+    call Class1.get 0
+    call Class2.get 0
+    add // (6 - 8) + (23 - 15) = 6
+    return
+  `);
+
+  // T.B.D
+});

@@ -207,6 +207,21 @@ export function compileFunction(m: Module, fn: Command[]) {
         exprs.push(m.return(ret));
         break;
       }
+      case "call": {
+        const [name, nargs] = c.args;
+        if (exprs.length < nargs) {
+          throw `Invalid Command: ${JSON.stringify(c)}`;
+        }
+
+        const args: number[] = [];
+        for (let i = 0; i < nargs; i++) {
+          args.push(exprs.pop()!);
+        }
+        args.reverse();
+
+        exprs.push(m.call(name, args, i32));
+        break;
+      }
       default:
         // const _: never = c.type;
         throw `Unimplemented Command: ${JSON.stringify(c)}`;
