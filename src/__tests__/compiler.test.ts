@@ -12,7 +12,7 @@ test("simple add", () => {
       return
     `);
 
-  const m = compile(commands);
+  const m = compile([commands]);
   const mem = new WebAssembly.Memory({ initial: 2, maximum: 2 });
   const imports = { js: { mem } };
 
@@ -33,7 +33,7 @@ test("simple comparison", () => {
       return
     `);
 
-  const m = compile(commands);
+  const m = compile([commands]);
   const mem = new WebAssembly.Memory({ initial: 2, maximum: 2 });
   const imports = { js: { mem } };
 
@@ -62,7 +62,7 @@ test("simple arithmetic", () => {
       return
     `);
 
-  const m = compile(commands);
+  const m = compile([commands]);
   const mem = new WebAssembly.Memory({ initial: 2, maximum: 2 });
   const imports = { js: { mem } };
 
@@ -97,7 +97,7 @@ test("local and argument", () => {
       return
     `);
 
-  const m = compile(commands);
+  const m = compile([commands]);
   const mem = new WebAssembly.Memory({ initial: 2, maximum: 2 });
   const imports = { js: { mem } };
 
@@ -133,7 +133,7 @@ test("pointer, this, that", () => {
   const mem = new WebAssembly.Memory({ initial: 2, maximum: 2 });
   const imports = { js: { mem } };
 
-  const m = compile(commands);
+  const m = compile([commands]);
   const wasm = m.emitBinary();
   const compiled = new WebAssembly.Module(wasm);
   const instance = new WebAssembly.Instance(compiled, imports);
@@ -187,7 +187,7 @@ test("temp", () => {
   const mem = new WebAssembly.Memory({ initial: 2, maximum: 2 });
   const imports = { js: { mem } };
 
-  const m = compile(commands);
+  const m = compile([commands]);
 
   const wasm = m.emitBinary();
   const compiled = new WebAssembly.Module(wasm);
@@ -213,7 +213,7 @@ test("static", () => {
   const mem = new WebAssembly.Memory({ initial: 2, maximum: 2 });
   const imports = { js: { mem } };
 
-  const m = compile(commands);
+  const m = compile([commands]);
 
   const wasm = m.emitBinary();
   const compiled = new WebAssembly.Module(wasm);
@@ -247,7 +247,7 @@ test("simple function", () => {
   const mem = new WebAssembly.Memory({ initial: 2, maximum: 2 });
   const imports = { js: { mem } };
 
-  const m = compile(commands);
+  const m = compile([commands]);
 
   const wasm = m.emitBinary();
   const compiled = new WebAssembly.Module(wasm);
@@ -257,7 +257,7 @@ test("simple function", () => {
   expect(e.test()).toBe(42);
 });
 
-xtest("multiple static", () => {
+test("multiple static", () => {
   const class1 = parse(`
     function Class1.set 0
     push argument 0
@@ -306,5 +306,15 @@ xtest("multiple static", () => {
     return
   `);
 
-  // T.B.D
+  const mem = new WebAssembly.Memory({ initial: 2, maximum: 2 });
+  const imports = { js: { mem } };
+
+  const m = compile([class1, class2, sys]);
+
+  const wasm = m.emitBinary();
+  const compiled = new WebAssembly.Module(wasm);
+  const instance = new WebAssembly.Instance(compiled, imports);
+
+  const e = instance.exports as any;
+  expect(e["Sys.init"]()).toBe(6);
 });
