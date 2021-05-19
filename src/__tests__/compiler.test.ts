@@ -15,8 +15,6 @@ test("simple add", () => {
   const m = new binaryen.Module();
   compile(m, commands);
 
-  expect(m.validate).toBeTruthy();
-
   const wasm = m.emitBinary();
   const compiled = new WebAssembly.Module(wasm);
   const instance = new WebAssembly.Instance(compiled, {});
@@ -36,8 +34,6 @@ test("simple comparison", () => {
 
   const m = new binaryen.Module();
   compile(m, commands);
-
-  expect(m.validate).toBeTruthy();
 
   const wasm = m.emitBinary();
   const compiled = new WebAssembly.Module(wasm);
@@ -66,8 +62,6 @@ test("simple arithmetic", () => {
 
   const m = new binaryen.Module();
   compile(m, commands);
-
-  expect(m.validate).toBeTruthy();
 
   const wasm = m.emitBinary();
   const compiled = new WebAssembly.Module(wasm);
@@ -102,8 +96,6 @@ test("local and argument", () => {
 
   const m = new binaryen.Module();
   compile(m, commands);
-
-  expect(m.validate).toBeTruthy();
 
   const wasm = m.emitBinary();
   const compiled = new WebAssembly.Module(wasm);
@@ -143,8 +135,6 @@ test("pointer, this, that", () => {
 
   compile(m, commands);
 
-  expect(m.validate).toBeTruthy();
-
   const wasm = m.emitBinary();
   const compiled = new WebAssembly.Module(wasm);
   const instance = new WebAssembly.Instance(compiled, imports);
@@ -156,4 +146,56 @@ test("pointer, this, that", () => {
   expect(buf.length).toBe(32768);
   expect(buf[3032]).toBe(32);
   expect(buf[3046]).toBe(46);
+});
+
+test("temp", () => {
+  const commands = parse(`
+    function test 0
+      push constant 1
+      pop temp 0
+      push constant 2
+      pop temp 1
+      push constant 3
+      pop temp 2
+      push constant 4
+      pop temp 3
+      push constant 5
+      pop temp 4
+      push constant 6
+      pop temp 5
+      push constant 7
+      pop temp 6
+      push constant 8
+      pop temp 7
+      push temp 0
+      push temp 1
+      push temp 2
+      push temp 3
+      push temp 4
+      push temp 5
+      push temp 6
+      push temp 7
+      add
+      add
+      add
+      add
+      add
+      add
+      add
+      return
+    `);
+
+  const m = new binaryen.Module();
+  m.addMemoryImport("0", "js", "mem");
+  const mem = new WebAssembly.Memory({ initial: 2, maximum: 2 });
+  const imports = { js: { mem } };
+
+  compile(m, commands);
+
+  const wasm = m.emitBinary();
+  const compiled = new WebAssembly.Module(wasm);
+  const instance = new WebAssembly.Instance(compiled, imports);
+
+  const e = instance.exports as any;
+  expect(e.test()).toBe(36);
 });

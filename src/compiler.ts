@@ -57,6 +57,9 @@ export function compile(m: Module, fn: Command[]) {
               )
             );
             break;
+          case "temp":
+            exprs.push(m.i32.load(4 * (5 + c.args[1]), 0, m.i32.const(0)));
+            break;
           default:
             throw `Unimplemented Command: ${JSON.stringify(c)}`;
         }
@@ -98,6 +101,9 @@ export function compile(m: Module, fn: Command[]) {
                 e
               )
             );
+            break;
+          case "temp":
+            exprs.push(m.i32.store(4 * (5 + c.args[1]), 0, m.i32.const(0), e));
             break;
           default:
             throw `Unimplemented Command: ${JSON.stringify(c)}`;
