@@ -1,7 +1,41 @@
-import { ExpressionRef, Module, createType, i32 } from "binaryen";
+import { ExpressionRef, Module, createType, i32, Features } from "binaryen";
 import { Command } from "./hackvm";
 
-export function compile(m: Module, fn: Command[]) {
+export function compile(program: Command[]) {
+  const m = new Module();
+  m.setFeatures(Features.MVP | Features.MutableGlobals);
+
+  // Handle Statics
+  const statics = new Set<number>();
+  for (const op of program) {
+    if ((op.type === "push" || op.type === "pop") && op.args[0] == "static") {
+      statics.add(op.args[1]);
+    }
+  }
+  statics.forEach((s) => m.addGlobal(`static${s}`, i32, true, m.i32.const(0)));
+
+  // Setup Memory
+  m.addMemoryImport("0", "js", "mem");
+
+  // Split by functions
+  const functions: Command[][] = program.reduce((fs, c) => {
+    if (c.type === "function") {
+      fs.push([c]);
+    } else {
+      fs[fs.length - 1].push(c);
+    }
+    return fs;
+  }, [] as Command[][]);
+
+  // Compile functions
+  for (const fn of functions) {
+    compileFunction(m, fn);
+  }
+
+  return m;
+}
+
+export function compileFunction(m: Module, fn: Command[]) {
   if (fn[0].type !== "function") {
     throw "Invalid Argument";
   }
@@ -60,8 +94,12 @@ export function compile(m: Module, fn: Command[]) {
           case "temp":
             exprs.push(m.i32.load(4 * (5 + c.args[1]), 0, m.i32.const(0)));
             break;
+          case "static":
+            exprs.push(m.global.get(`static${c.args[1]}`, i32));
+            break;
           default:
-            throw `Unimplemented Command: ${JSON.stringify(c)}`;
+            const _: never = c.args[0];
+            throw `Invalid Argument ${JSON.stringify(c)}`;
         }
         break;
       }
@@ -105,8 +143,14 @@ export function compile(m: Module, fn: Command[]) {
           case "temp":
             exprs.push(m.i32.store(4 * (5 + c.args[1]), 0, m.i32.const(0), e));
             break;
+          case "static":
+            exprs.push(m.global.set(`static${c.args[1]}`, e));
+            break;
+          case "constant":
+            throw `Invalid Argument ${JSON.stringify(c)}`;
           default:
-            throw `Unimplemented Command: ${JSON.stringify(c)}`;
+            const _: never = c.args[0];
+            throw `Invalid Argument ${JSON.stringify(c)}`;
         }
         break;
       }
@@ -164,6 +208,7 @@ export function compile(m: Module, fn: Command[]) {
         break;
       }
       default:
+        // const _: never = c.type;
         throw `Unimplemented Command: ${JSON.stringify(c)}`;
     }
   }
