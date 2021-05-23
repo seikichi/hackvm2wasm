@@ -319,7 +319,7 @@ test("multiple static", () => {
   expect(e["Sys.init"]()).toBe(6);
 });
 
-test.only("label, goto, if-goto: mult", () => {
+test("label, goto, if-goto: mult", () => {
   const commands = parse(`
     function mult 2
       push constant 0
@@ -349,7 +349,6 @@ test.only("label, goto, if-goto: mult", () => {
     `);
 
   const m = compile([commands]);
-  m.optimize();
   const mem = new WebAssembly.Memory({ initial: 2, maximum: 2 });
   const imports = { js: { mem } };
 
@@ -391,7 +390,6 @@ test("label, goto, if-goto: mult", () => {
     `);
 
   const m = compile([commands]);
-  m.optimize();
   const mem = new WebAssembly.Memory({ initial: 2, maximum: 2 });
   const imports = { js: { mem } };
 
@@ -403,7 +401,7 @@ test("label, goto, if-goto: mult", () => {
   expect(e.mult(6, 111)).toBe(666);
 });
 
-test.only("basic loop", () => {
+test("basic loop", () => {
   const commands = parse(`
     function test 1
       // Computes the sum 1 + 2 + ... + argument[0] and pushes the
@@ -429,7 +427,6 @@ test.only("basic loop", () => {
     `);
 
   const m = compile([commands]);
-  m.optimize();
   const mem = new WebAssembly.Memory({ initial: 2, maximum: 2 });
   const imports = { js: { mem } };
 
@@ -439,4 +436,96 @@ test.only("basic loop", () => {
 
   const e = instance.exports as any;
   expect(e.test(10)).toBe(55);
+});
+
+test("nested call", () => {
+  const commands = parse(`
+    function Sys.main 5
+    push constant 4001
+    pop pointer 0
+    push constant 5001
+    pop pointer 1
+    push constant 200
+    pop local 1
+    push constant 40
+    pop local 2
+    push constant 6
+    pop local 3
+    push constant 123
+    call Sys.add12 1
+    pop temp 0
+    push local 0
+    push local 1
+    push local 2
+    push local 3
+    push local 4
+    add
+    add
+    add
+    add
+    return
+
+    function Sys.add12 0
+    push constant 4002
+    pop pointer 0
+    push constant 5002
+    pop pointer 1
+    push argument 0
+    push constant 12
+    add
+    return
+    `);
+
+  const m = compile([commands]);
+  const mem = new WebAssembly.Memory({ initial: 2, maximum: 2 });
+  const imports = { js: { mem } };
+
+  const wasm = m.emitBinary();
+  const compiled = new WebAssembly.Module(wasm);
+  const instance = new WebAssembly.Instance(compiled, imports);
+
+  const e = instance.exports as any;
+  expect(e["Sys.main"]()).toBe(246);
+});
+
+test("fibonacci", () => {
+  const main = parse(`
+  function Main.fibonacci 0
+  push argument 0
+  push constant 2
+  lt                     // checks if n<2
+  if-goto IF_TRUE
+  goto IF_FALSE
+  label IF_TRUE          // if n<2, return n
+  push argument 0
+  return
+  label IF_FALSE         // if n>=2, returns fib(n-2)+fib(n-1)
+  push argument 0
+  push constant 2
+  sub
+  call Main.fibonacci 1  // computes fib(n-2)
+  push argument 0
+  push constant 1
+  sub
+  call Main.fibonacci 1  // computes fib(n-1)
+  add                    // returns fib(n-1) + fib(n-2)
+  return
+    `);
+  const sys = parse(`
+  function Sys.init 0
+  push constant 4
+  call Main.fibonacci 1   // computes the 4'th fibonacci element
+  return
+  `);
+
+  const m = compile([main, sys]);
+  const mem = new WebAssembly.Memory({ initial: 2, maximum: 2 });
+  const imports = { js: { mem } };
+
+  const wasm = m.emitBinary();
+  const compiled = new WebAssembly.Module(wasm);
+  const instance = new WebAssembly.Instance(compiled, imports);
+
+  const e = instance.exports as any;
+  expect(e["Sys.init"]()).toBe(3);
 });
