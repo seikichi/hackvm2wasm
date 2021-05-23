@@ -1,4 +1,10 @@
-import { ExpressionRef, Module, createType, i32, Features } from "binaryen";
+import binaryen, {
+  ExpressionRef,
+  Module,
+  createType,
+  i32,
+  Features,
+} from "binaryen";
 import { Command } from "./hackvm";
 
 export function compile(programs: Command[][]) {
@@ -55,17 +61,119 @@ function compileFunction(m: Module, fn: Command[], id: number) {
     }
   }
 
-  const [name, nlocals] = fn[0].args;
+  const name = fn[0].args[0];
+  const nlocals = fn[0].args[1] + 1; // +1 for Relooper variable
   const params = createType(new Array(nargs).fill(i32));
   const results = i32;
   const vars = new Array(nlocals + 2).fill(i32);
   const thisIndex = nargs + nlocals;
   const thatIndex = nargs + nlocals + 1;
 
-  const exprs: ExpressionRef[] = [];
+  // Split by blocks
+  const commandBlocks: Command[][] = fn
+    .slice(1)
+    .reduce(
+      (bs, c) => {
+        if (c.type === "label") {
+          bs.push([c]);
+        } else if (c.type === "goto" || c.type === "if-goto") {
+          bs[bs.length - 1].push(c);
+          bs.push([]);
+        } else {
+          bs[bs.length - 1].push(c);
+        }
+        return bs;
+      },
+      [[]] as Command[][]
+    )
+    .filter((bs) => bs.length > 0);
 
-  for (const c of fn.slice(1)) {
+  const options = { nargs, thisIndex, thatIndex, id };
+
+  const blocks: Block[] = [];
+  for (const b of commandBlocks) {
+    blocks.push(compileBlock(m, b, options));
+  }
+
+  const r = new binaryen.Relooper(m);
+  const blockRefs: binaryen.RelooperBlockRef[] = [];
+  for (let i = 0; i < blocks.length; i++) {
+    const b = blocks[i].refs.length === 0 ? 0 : m.block("", blocks[i].refs);
+    blockRefs.push(r.addBlock(b));
+  }
+
+  for (let i = 0; i < blocks.length; i++) {
+    const b = blocks[i];
+    if (b.branch) {
+      const { label, condition } = b.branch;
+      const next = blocks.findIndex((b) => b.label === label);
+      if (next === -1) {
+        throw `label ${label} not found`;
+      }
+      r.addBranch(blockRefs[i], blockRefs[next], condition, 0);
+    }
+    if (b.branch && b.branch.condition === 0) {
+      continue;
+    }
+    if (i + 1 < blocks.length) {
+      r.addBranch(blockRefs[i], blockRefs[i + 1], 0, 0);
+    }
+  }
+
+  const body = r.renderAndDispose(blockRefs[0], nargs + nlocals - 1);
+
+  m.addFunction(name, params, results, vars, body);
+  m.addFunctionExport(name, name);
+}
+
+interface FunctionOption {
+  id: number;
+  nargs: number;
+  thisIndex: number;
+  thatIndex: number;
+}
+
+interface Block {
+  label?: string;
+  refs: ExpressionRef[];
+  branch?: {
+    label: string;
+    condition: ExpressionRef;
+  };
+}
+
+function compileBlock(
+  m: Module,
+  b: Command[],
+  { id, nargs, thisIndex, thatIndex }: FunctionOption
+): Block {
+  let label: string | undefined;
+  const exprs: ExpressionRef[] = [];
+  let branch: Block["branch"] | undefined;
+
+  for (const c of b) {
     switch (c.type) {
+      case "label":
+        if (label) {
+          throw `Invalid Argument ${JSON.stringify(c)}`;
+        }
+        label = c.args[0];
+        break;
+      case "goto":
+        if (branch) {
+          throw `Invalid Argument ${JSON.stringify(c)}`;
+        }
+        branch = { label: c.args[0], condition: 0 };
+        break;
+      case "if-goto": {
+        if (branch || exprs.length < 1) {
+          throw `Invalid Argument ${JSON.stringify(c)}`;
+        }
+        const e = exprs.pop()!;
+        const condition = m.i32.ne(e, m.i32.const(0));
+        branch = { label: c.args[0], condition };
+        break;
+      }
       case "push": {
         switch (c.args[0]) {
           case "constant":
@@ -203,6 +311,7 @@ function compileFunction(m: Module, fn: Command[], id: number) {
 
         if (c.type === "eq" || c.type === "lt" || c.type === "gt") {
           const e = exprs.pop()!;
+          // exprs.push(m.select(e, m.i32.const(-1), m.i32.const(0)));
           exprs.push(m.select(e, m.i32.const(-1), m.i32.const(0)));
         }
         break;
@@ -230,13 +339,13 @@ function compileFunction(m: Module, fn: Command[], id: number) {
         exprs.push(m.call(name, args, i32));
         break;
       }
+      case "function":
+        throw `Unimplemented Command: ${JSON.stringify(c)}`;
       default:
         // const _: never = c.type;
         throw `Unimplemented Command: ${JSON.stringify(c)}`;
     }
   }
 
-  const body = exprs.length === 1 ? exprs[0] : m.block("block", exprs);
-  m.addFunction(name, params, results, vars, body);
-  m.addFunctionExport(name, name);
+  return { label, refs: exprs, branch };
 }

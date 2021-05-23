@@ -318,3 +318,125 @@ test("multiple static", () => {
   const e = instance.exports as any;
   expect(e["Sys.init"]()).toBe(6);
 });
+
+test.only("label, goto, if-goto: mult", () => {
+  const commands = parse(`
+    function mult 2
+      push constant 0
+      pop local 0
+      push argument 1
+      pop local 1
+
+      label LOOP
+      push constant 0
+      push local 1
+      eq
+      if-goto END
+
+      push local 0
+      push argument 0
+      add
+      pop local 0
+      push local 1
+      push constant 1
+      sub
+      pop local 1
+      goto LOOP
+
+      label END
+      push local 0
+      return
+    `);
+
+  const m = compile([commands]);
+  m.optimize();
+  const mem = new WebAssembly.Memory({ initial: 2, maximum: 2 });
+  const imports = { js: { mem } };
+
+  const wasm = m.emitBinary();
+  const compiled = new WebAssembly.Module(wasm);
+  const instance = new WebAssembly.Instance(compiled, imports);
+
+  const e = instance.exports as any;
+  expect(e.mult(6, 111)).toBe(666);
+});
+
+test("label, goto, if-goto: mult", () => {
+  const commands = parse(`
+    function mult 2
+      push constant 0
+      pop local 0
+      push argument 1
+      pop local 1
+
+      label LOOP
+      push constant 0
+      push local 1
+      eq
+      if-goto END
+
+      push local 0
+      push argument 0
+      add
+      pop local 0
+      push local 1
+      push constant 1
+      sub
+      pop local 1
+      goto LOOP
+
+      label END
+      push local 0
+      return
+    `);
+
+  const m = compile([commands]);
+  m.optimize();
+  const mem = new WebAssembly.Memory({ initial: 2, maximum: 2 });
+  const imports = { js: { mem } };
+
+  const wasm = m.emitBinary();
+  const compiled = new WebAssembly.Module(wasm);
+  const instance = new WebAssembly.Instance(compiled, imports);
+
+  const e = instance.exports as any;
+  expect(e.mult(6, 111)).toBe(666);
+});
+
+test.only("basic loop", () => {
+  const commands = parse(`
+    function test 1
+      // Computes the sum 1 + 2 + ... + argument[0] and pushes the
+      // result onto the stack. Argument[0] is initialized by the test
+      // script before this code starts running.
+      push constant 0
+      pop local 0         // initializes sum = 0
+
+      label LOOP_START
+      push argument 0
+      push local 0
+      add
+      pop local 0	        // sum = sum + counter
+      push argument 0
+      push constant 1
+      sub
+      pop argument 0      // counter--
+      push argument 0
+      if-goto LOOP_START  // If counter != 0, goto LOOP_START
+
+      push local 0
+      return
+    `);
+
+  const m = compile([commands]);
+  m.optimize();
+  const mem = new WebAssembly.Memory({ initial: 2, maximum: 2 });
+  const imports = { js: { mem } };
+
+  const wasm = m.emitBinary();
+  const compiled = new WebAssembly.Module(wasm);
+  const instance = new WebAssembly.Instance(compiled, imports);
+
+  const e = instance.exports as any;
+  expect(e.test(10)).toBe(55);
+});
