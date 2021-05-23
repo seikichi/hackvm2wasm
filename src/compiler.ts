@@ -11,6 +11,10 @@ export function compile(programs: Command[][]) {
   const m = new Module();
   m.setFeatures(Features.MVP | Features.MutableGlobals);
 
+  // Setup Memory
+  m.setMemory(2, 2);
+  m.addMemoryImport("0", "js", "mem");
+
   programs.forEach((p, i) => {
     compileProgram(m, p, i);
   });
@@ -29,9 +33,6 @@ export function compileProgram(m: Module, program: Command[], id: number) {
   statics.forEach((s) =>
     m.addGlobal(`static.${id}.${s}`, i32, true, m.i32.const(0))
   );
-
-  // Setup Memory
-  m.addMemoryImport("0", "js", "mem");
 
   // Split by functions
   const functions: Command[][] = program.reduce((fs, c) => {

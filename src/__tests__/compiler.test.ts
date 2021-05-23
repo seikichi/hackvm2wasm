@@ -13,6 +13,8 @@ test("simple add", () => {
     `);
 
   const m = compile([commands]);
+  expect(m.validate()).not.toBe(0);
+
   const mem = new WebAssembly.Memory({ initial: 2, maximum: 2 });
   const imports = { js: { mem } };
 
@@ -34,6 +36,8 @@ test("simple comparison", () => {
     `);
 
   const m = compile([commands]);
+  expect(m.validate()).not.toBe(0);
+
   const mem = new WebAssembly.Memory({ initial: 2, maximum: 2 });
   const imports = { js: { mem } };
 
@@ -63,6 +67,8 @@ test("simple arithmetic", () => {
     `);
 
   const m = compile([commands]);
+  expect(m.validate()).not.toBe(0);
+
   const mem = new WebAssembly.Memory({ initial: 2, maximum: 2 });
   const imports = { js: { mem } };
 
@@ -98,6 +104,8 @@ test("local and argument", () => {
     `);
 
   const m = compile([commands]);
+  expect(m.validate()).not.toBe(0);
+
   const mem = new WebAssembly.Memory({ initial: 2, maximum: 2 });
   const imports = { js: { mem } };
 
@@ -134,6 +142,8 @@ test("pointer, this, that", () => {
   const imports = { js: { mem } };
 
   const m = compile([commands]);
+  expect(m.validate()).not.toBe(0);
+
   const wasm = m.emitBinary();
   const compiled = new WebAssembly.Module(wasm);
   const instance = new WebAssembly.Instance(compiled, imports);
@@ -188,6 +198,7 @@ test("temp", () => {
   const imports = { js: { mem } };
 
   const m = compile([commands]);
+  expect(m.validate()).not.toBe(0);
 
   const wasm = m.emitBinary();
   const compiled = new WebAssembly.Module(wasm);
@@ -214,6 +225,7 @@ test("static", () => {
   const imports = { js: { mem } };
 
   const m = compile([commands]);
+  expect(m.validate()).not.toBe(0);
 
   const wasm = m.emitBinary();
   const compiled = new WebAssembly.Module(wasm);
@@ -248,6 +260,7 @@ test("simple function", () => {
   const imports = { js: { mem } };
 
   const m = compile([commands]);
+  expect(m.validate()).not.toBe(0);
 
   const wasm = m.emitBinary();
   const compiled = new WebAssembly.Module(wasm);
@@ -310,6 +323,7 @@ test("multiple static", () => {
   const imports = { js: { mem } };
 
   const m = compile([class1, class2, sys]);
+  expect(m.validate()).not.toBe(0);
 
   const wasm = m.emitBinary();
   const compiled = new WebAssembly.Module(wasm);
@@ -349,6 +363,8 @@ test("label, goto, if-goto: mult", () => {
     `);
 
   const m = compile([commands]);
+  expect(m.validate()).not.toBe(0);
+
   const mem = new WebAssembly.Memory({ initial: 2, maximum: 2 });
   const imports = { js: { mem } };
 
@@ -390,6 +406,8 @@ test("label, goto, if-goto: mult", () => {
     `);
 
   const m = compile([commands]);
+  expect(m.validate()).not.toBe(0);
+
   const mem = new WebAssembly.Memory({ initial: 2, maximum: 2 });
   const imports = { js: { mem } };
 
@@ -427,6 +445,8 @@ test("basic loop", () => {
     `);
 
   const m = compile([commands]);
+  expect(m.validate()).not.toBe(0);
+
   const mem = new WebAssembly.Memory({ initial: 2, maximum: 2 });
   const imports = { js: { mem } };
 
@@ -477,6 +497,8 @@ test("nested call", () => {
     `);
 
   const m = compile([commands]);
+  expect(m.validate()).not.toBe(0);
+
   const mem = new WebAssembly.Memory({ initial: 2, maximum: 2 });
   const imports = { js: { mem } };
 
@@ -519,6 +541,8 @@ test("fibonacci", () => {
   `);
 
   const m = compile([main, sys]);
+  expect(m.validate()).not.toBe(0);
+
   const mem = new WebAssembly.Memory({ initial: 2, maximum: 2 });
   const imports = { js: { mem } };
 
