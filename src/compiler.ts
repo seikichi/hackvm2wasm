@@ -5,7 +5,280 @@ import binaryen, {
   i32,
   Features,
 } from "binaryen";
+import wabt from "wabt";
 import { Command } from "./hackvm";
+import wat from "./wat";
+
+export async function compileV2(programs: Command[][]) {
+  const m = wat.module([
+    wat.import("js", "mem", wat.memory(2, 2)),
+    ...programs.flatMap((p, i) => _compileProgram(p, i)),
+  ]);
+  const w = await wabt();
+  const module = w.parseWat("HACKVM", m, { mutable_globals: true });
+  return new WebAssembly.Module(module.toBinary({}).buffer);
+}
+
+function _compileProgram(program: Command[], id: number): string[] {
+  const result: string[] = [];
+
+  const statics = new Set<number>();
+  for (const op of program) {
+    if ((op.type === "push" || op.type === "pop") && op.args[0] == "static") {
+      statics.add(op.args[1]);
+    }
+  }
+
+  // FIXME
+  statics.forEach((s) =>
+    result.push(`(global $static_${id}_${s} (mut i32) (i32.const 0))`)
+  );
+
+  // Split by functions
+  const functions: Command[][] = program.reduce((fs, c) => {
+    if (c.type === "function") {
+      fs.push([c]);
+    } else {
+      fs[fs.length - 1].push(c);
+    }
+    return fs;
+  }, [] as Command[][]);
+
+  // Compile functions
+  for (const fn of functions) {
+    result.push(_compileFunction(fn, id));
+  }
+
+  return result;
+}
+
+function _compileFunction(fn: Command[], id: number): string {
+  if (fn[0].type !== "function") {
+    throw "Invalid Argument";
+  }
+
+  let nargs = 0;
+  for (const c of fn) {
+    if ((c.type === "push" || c.type === "pop") && c.args[0] === "argument") {
+      nargs = Math.max(nargs, c.args[1] + 1);
+    }
+  }
+
+  const name = fn[0].args[0];
+  const nlocals = fn[0].args[1] + 1; // +1 for switch variable
+  const thisIndex = nargs + nlocals;
+  const thatIndex = nargs + nlocals + 1;
+
+  // Split by blocks
+  const commandBlocks: Command[][] = fn
+    .slice(1)
+    .reduce(
+      (bs, c) => {
+        if (c.type === "label") {
+          bs.push([c]);
+        } else if (c.type === "goto" || c.type === "if-goto") {
+          bs[bs.length - 1].push(c);
+          bs.push([]);
+        } else {
+          bs[bs.length - 1].push(c);
+        }
+        return bs;
+      },
+      [[]] as Command[][]
+    )
+    .filter((bs) => bs.length > 0);
+
+  const options = { nargs, thisIndex, thatIndex, id };
+
+  if (commandBlocks.length !== 1) {
+    throw "multiple blocks compile is not supported yet";
+  }
+  const blocks = _compileBlock(commandBlocks[0], options);
+
+  return wat.func(`$${name}`, [
+    wat.export(name),
+    ...new Array(nargs).fill(wat.param("i32")),
+    wat.result("i32"),
+    ...new Array(nlocals + 2).fill(wat.local("i32")),
+
+    ...blocks,
+  ]);
+}
+
+function _compileBlock(
+  b: Command[],
+  { id, nargs, thisIndex, thatIndex }: FunctionOption
+): string[] {
+  const results: string[] = [];
+  for (const c of b) {
+    switch (c.type) {
+      // case "label":
+      //   if (label) {
+      //     throw `Invalid Argument ${JSON.stringify(c)}`;
+      //   }
+      //   label = c.args[0];
+      //   break;
+      // case "goto":
+      //   if (branch) {
+      //     throw `Invalid Argument ${JSON.stringify(c)}`;
+      //   }
+      //   branch = { label: c.args[0], condition: 0 };
+      //   break;
+      // case "if-goto": {
+      //   if (branch || exprs.length < 1) {
+      //     throw `Invalid Argument ${JSON.stringify(c)}`;
+      //   }
+      //   const e = exprs.pop()!;
+      //   const condition = m.i32.ne(e, m.i32.const(0));
+      //   branch = { label: c.args[0], condition };
+      //   break;
+      // }
+      case "push": {
+        switch (c.args[0]) {
+          case "constant":
+            results.push(wat.i32.const(c.args[1]));
+            break;
+          //     case "argument":
+          //       exprs.push(m.local.get(c.args[1], i32));
+          //       break;
+          //     case "local":
+          //       exprs.push(m.local.get(c.args[1] + nargs, i32));
+          //       break;
+          //     case "pointer":
+          //       const index = c.args[1] == 0 ? thisIndex : thatIndex;
+          //       exprs.push(m.local.get(index, i32));
+          //       break;
+          //     case "this":
+          //       exprs.push(
+          //         m.i32.load(
+          //           4 * c.args[1],
+          //           0,
+          //           m.i32.mul(m.i32.const(4), m.local.get(thisIndex, i32))
+          //         )
+          //       );
+          //       break;
+          //     case "that":
+          //       exprs.push(
+          //         m.i32.load(
+          //           4 * c.args[1],
+          //           0,
+          //           m.i32.mul(m.i32.const(4), m.local.get(thatIndex, i32))
+          //         )
+          //       );
+          //       break;
+          //     case "temp":
+          //       exprs.push(m.i32.load(4 * (5 + c.args[1]), 0, m.i32.const(0)));
+          //       break;
+          //     case "static":
+          //       exprs.push(m.global.get(`static.${id}.${c.args[1]}`, i32));
+          //       break;
+          default:
+            //       const _: never = c.args[0];
+            throw `Invalid Argument ${JSON.stringify(c)}`;
+        }
+        break;
+      }
+      // case "pop": {
+      //   if (exprs.length < 1) {
+      //     throw `Invalid Command: ${JSON.stringify(c)}`;
+      //   }
+      //   const e = exprs.pop()!;
+
+      //   switch (c.args[0]) {
+      //     case "argument":
+      //       exprs.push(m.local.set(c.args[1], e));
+      //       break;
+      //     case "local":
+      //       exprs.push(m.local.set(c.args[1] + nargs, e));
+      //       break;
+      //     case "pointer":
+      //       const index = c.args[1] == 0 ? thisIndex : thatIndex;
+      //       exprs.push(m.local.set(index, e));
+      //       break;
+      //     case "this":
+      //       exprs.push(
+      //         m.i32.store(
+      //           4 * c.args[1],
+      //           0,
+      //           m.i32.mul(m.i32.const(4), m.local.get(thisIndex, i32)),
+      //           e
+      //         )
+      //       );
+      //       break;
+      //     case "that":
+      //       exprs.push(
+      //         m.i32.store(
+      //           4 * c.args[1],
+      //           0,
+      //           m.i32.mul(m.i32.const(4), m.local.get(thatIndex, i32)),
+      //           e
+      //         )
+      //       );
+      //       break;
+      //     case "temp":
+      //       exprs.push(m.i32.store(4 * (5 + c.args[1]), 0, m.i32.const(0), e));
+      //       break;
+      //     case "static":
+      //       exprs.push(m.global.set(`static.${id}.${c.args[1]}`, e));
+      //       break;
+      //     case "constant":
+      //       throw `Invalid Argument ${JSON.stringify(c)}`;
+      //     default:
+      //       const _: never = c.args[0];
+      //       throw `Invalid Argument ${JSON.stringify(c)}`;
+      //   }
+      //   break;
+      // }
+      case "neg":
+        results.push(wat.i32.const(-1));
+        results.push(wat.i32.mul());
+        break;
+      case "not":
+        results.push(wat.i32.const(-1));
+        results.push(wat.i32.xor());
+        break;
+      case "add":
+      case "sub":
+      case "eq":
+      case "gt":
+      case "lt":
+      case "and":
+      case "or": {
+        const operations = {
+          add: wat.i32.add,
+          sub: wat.i32.sub,
+          eq: wat.i32.eq,
+          gt: wat.i32.gt_s,
+          lt: wat.i32.lt_s,
+          and: wat.i32.and,
+          or: wat.i32.or,
+        };
+        results.push(operations[c.type]());
+
+        if (c.type === "eq" || c.type === "lt" || c.type === "gt") {
+          results.push(wat.i32.const(-1));
+          results.push(wat.i32.const(0));
+          results.push(wat.select());
+        }
+        break;
+      }
+      case "return":
+        results.push(wat.return());
+        break;
+      case "call":
+        const [name, _nargs] = c.args;
+        results.push(wat.call(`$${name}`));
+        break;
+      case "function":
+        throw `Invali Command: ${JSON.stringify(c)}`;
+      default:
+        // const _: never = c.type;
+        throw `Unimplemented Command: ${JSON.stringify(c)}`;
+    }
+  }
+
+  return results;
+}
 
 export function compile(programs: Command[][]) {
   const m = new Module();

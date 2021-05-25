@@ -1,9 +1,9 @@
 import binaryen from "binaryen";
 
-import { compile } from "../compiler";
+import { compile, compileV2 } from "../compiler";
 import { parse } from "../hackvm";
 
-test("simple add", () => {
+test.only("simple add", async () => {
   const commands = parse(`
     function test 0
       push constant 7
@@ -12,14 +12,11 @@ test("simple add", () => {
       return
     `);
 
-  const m = compile([commands]);
-  expect(m.validate()).not.toBe(0);
+  const compiled = await compileV2([commands]);
 
   const mem = new WebAssembly.Memory({ initial: 2, maximum: 2 });
   const imports = { js: { mem } };
 
-  const wasm = m.emitBinary();
-  const compiled = new WebAssembly.Module(wasm);
   const instance = new WebAssembly.Instance(compiled, imports);
 
   const e = instance.exports as any;
