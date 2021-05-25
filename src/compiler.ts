@@ -12,6 +12,9 @@ import wat from "./wat";
 export async function compileV2(programs: Command[][]) {
   const m = wat.module([
     wat.import("js", "mem", wat.memory(2, 2)),
+    ...new Array(8)
+      .fill(0)
+      .map((_, i) => `(global $temp${i} (mut i32) (i32.const 0))`), // FIXME
     ...programs.flatMap((p, i) => _compileProgram(p, i)),
   ]);
   const w = await wabt();
@@ -109,6 +112,7 @@ function _compileBlock(
   b: Command[],
   { id, nargs, thisIndex, thatIndex }: FunctionOption
 ): string[] {
+  const tempLocal = thisIndex - 1; // FIXME;
   const results: string[] = [];
   for (const c of b) {
     switch (c.type) {
@@ -138,97 +142,82 @@ function _compileBlock(
           case "constant":
             results.push(wat.i32.const(c.args[1]));
             break;
-          //     case "argument":
-          //       exprs.push(m.local.get(c.args[1], i32));
-          //       break;
-          //     case "local":
-          //       exprs.push(m.local.get(c.args[1] + nargs, i32));
-          //       break;
-          //     case "pointer":
-          //       const index = c.args[1] == 0 ? thisIndex : thatIndex;
-          //       exprs.push(m.local.get(index, i32));
-          //       break;
-          //     case "this":
-          //       exprs.push(
-          //         m.i32.load(
-          //           4 * c.args[1],
-          //           0,
-          //           m.i32.mul(m.i32.const(4), m.local.get(thisIndex, i32))
-          //         )
-          //       );
-          //       break;
-          //     case "that":
-          //       exprs.push(
-          //         m.i32.load(
-          //           4 * c.args[1],
-          //           0,
-          //           m.i32.mul(m.i32.const(4), m.local.get(thatIndex, i32))
-          //         )
-          //       );
-          //       break;
-          //     case "temp":
-          //       exprs.push(m.i32.load(4 * (5 + c.args[1]), 0, m.i32.const(0)));
-          //       break;
-          //     case "static":
-          //       exprs.push(m.global.get(`static.${id}.${c.args[1]}`, i32));
-          //       break;
+          case "argument":
+            results.push(wat.local.get(c.args[1]));
+            break;
+          case "local":
+            results.push(wat.local.get(nargs + c.args[1]));
+            break;
+          case "pointer":
+            const index = c.args[1] == 0 ? thisIndex : thatIndex;
+            results.push(wat.local.get(index));
+            break;
+          case "this":
+            results.push(wat.i32.const(4));
+            results.push(wat.local.get(thisIndex));
+            results.push(wat.i32.mul());
+            results.push(wat.i32.load(4 * c.args[1]));
+            break;
+          case "that":
+            results.push(wat.i32.const(4));
+            results.push(wat.local.get(thatIndex));
+            results.push(wat.i32.mul());
+            results.push(wat.i32.load(4 * c.args[1]));
+            break;
+          case "temp":
+            results.push(wat.global.get(`$temp${c.args[1]}`));
+            break;
+          case "static":
+            results.push(wat.global.get(`$static_${id}_${c.args[1]}`));
+            break;
           default:
-            //       const _: never = c.args[0];
+            const _: never = c.args[0];
             throw `Invalid Argument ${JSON.stringify(c)}`;
         }
         break;
       }
-      // case "pop": {
-      //   if (exprs.length < 1) {
-      //     throw `Invalid Command: ${JSON.stringify(c)}`;
-      //   }
-      //   const e = exprs.pop()!;
-
-      //   switch (c.args[0]) {
-      //     case "argument":
-      //       exprs.push(m.local.set(c.args[1], e));
-      //       break;
-      //     case "local":
-      //       exprs.push(m.local.set(c.args[1] + nargs, e));
-      //       break;
-      //     case "pointer":
-      //       const index = c.args[1] == 0 ? thisIndex : thatIndex;
-      //       exprs.push(m.local.set(index, e));
-      //       break;
-      //     case "this":
-      //       exprs.push(
-      //         m.i32.store(
-      //           4 * c.args[1],
-      //           0,
-      //           m.i32.mul(m.i32.const(4), m.local.get(thisIndex, i32)),
-      //           e
-      //         )
-      //       );
-      //       break;
-      //     case "that":
-      //       exprs.push(
-      //         m.i32.store(
-      //           4 * c.args[1],
-      //           0,
-      //           m.i32.mul(m.i32.const(4), m.local.get(thatIndex, i32)),
-      //           e
-      //         )
-      //       );
-      //       break;
-      //     case "temp":
-      //       exprs.push(m.i32.store(4 * (5 + c.args[1]), 0, m.i32.const(0), e));
-      //       break;
-      //     case "static":
-      //       exprs.push(m.global.set(`static.${id}.${c.args[1]}`, e));
-      //       break;
-      //     case "constant":
-      //       throw `Invalid Argument ${JSON.stringify(c)}`;
-      //     default:
-      //       const _: never = c.args[0];
-      //       throw `Invalid Argument ${JSON.stringify(c)}`;
-      //   }
-      //   break;
-      // }
+      case "pop": {
+        switch (c.args[0]) {
+          case "argument":
+            results.push(wat.local.set(c.args[1]));
+            break;
+          case "local":
+            results.push(wat.local.set(nargs + c.args[1]));
+            break;
+          case "pointer":
+            const index = c.args[1] == 0 ? thisIndex : thatIndex;
+            results.push(wat.local.set(index));
+            break;
+          case "this":
+            results.push(wat.local.set(tempLocal));
+            results.push(wat.i32.const(4));
+            results.push(wat.local.get(thisIndex));
+            results.push(wat.i32.mul());
+            results.push(wat.local.get(tempLocal));
+            results.push(wat.i32.store(4 * c.args[1]));
+            break;
+          case "that":
+            results.push(wat.local.set(tempLocal));
+            results.push(wat.i32.const(4));
+            results.push(wat.local.get(thatIndex));
+            results.push(wat.i32.mul());
+            results.push(wat.local.get(tempLocal));
+            results.push(wat.i32.store(4 * c.args[1]));
+            break;
+          case "temp":
+            results.push(wat.global.set(`$temp${c.args[1]}`));
+            break;
+          case "static":
+            results.push(wat.global.set(`$static_${id}_${c.args[1]}`));
+            break;
+          case "constant":
+            throw `Invalid Argument ${JSON.stringify(c)}`;
+          default:
+            const _: never = c.args[0];
+            throw `Invalid Argument ${JSON.stringify(c)}`;
+        }
+        break;
+      }
       case "neg":
         results.push(wat.i32.const(-1));
         results.push(wat.i32.mul());

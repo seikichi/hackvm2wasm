@@ -23,7 +23,7 @@ test.only("simple add", async () => {
   expect(e.test()).toBe(15);
 });
 
-test("simple comparison", () => {
+test.only("simple comparison", async () => {
   const commands = parse(`
     function test 0
       push constant 892
@@ -32,21 +32,18 @@ test("simple comparison", () => {
       return
     `);
 
-  const m = compile([commands]);
-  expect(m.validate()).not.toBe(0);
+  const compiled = await compileV2([commands]);
 
   const mem = new WebAssembly.Memory({ initial: 2, maximum: 2 });
   const imports = { js: { mem } };
 
-  const wasm = m.emitBinary();
-  const compiled = new WebAssembly.Module(wasm);
   const instance = new WebAssembly.Instance(compiled, imports);
 
   const e = instance.exports as any;
   expect(e.test()).toBe(-1);
 });
 
-test("simple arithmetic", () => {
+test.only("simple arithmetic", async () => {
   const commands = parse(`
     function test 0
       push constant 57
@@ -63,21 +60,18 @@ test("simple arithmetic", () => {
       return
     `);
 
-  const m = compile([commands]);
-  expect(m.validate()).not.toBe(0);
+  const compiled = await compileV2([commands]);
 
   const mem = new WebAssembly.Memory({ initial: 2, maximum: 2 });
   const imports = { js: { mem } };
 
-  const wasm = m.emitBinary();
-  const compiled = new WebAssembly.Module(wasm);
   const instance = new WebAssembly.Instance(compiled, imports);
 
   const e = instance.exports as any;
   expect(e.test()).toBe(-91);
 });
 
-test("local and argument", () => {
+test.only("local and argument", async () => {
   const commands = parse(`
     function test 1
       // local[0] = argument[0] + argument[1]
@@ -100,21 +94,18 @@ test("local and argument", () => {
       return
     `);
 
-  const m = compile([commands]);
-  expect(m.validate()).not.toBe(0);
+  const compiled = await compileV2([commands]);
 
   const mem = new WebAssembly.Memory({ initial: 2, maximum: 2 });
   const imports = { js: { mem } };
 
-  const wasm = m.emitBinary();
-  const compiled = new WebAssembly.Module(wasm);
   const instance = new WebAssembly.Instance(compiled, imports);
 
   const e = instance.exports as any;
   expect(e.test(1, 20)).toBe(42);
 });
 
-test("pointer, this, that", () => {
+test.only("pointer, this, that", async () => {
   const commands = parse(`
     function test 0
       push constant 3030
@@ -138,11 +129,7 @@ test("pointer, this, that", () => {
   const mem = new WebAssembly.Memory({ initial: 2, maximum: 2 });
   const imports = { js: { mem } };
 
-  const m = compile([commands]);
-  expect(m.validate()).not.toBe(0);
-
-  const wasm = m.emitBinary();
-  const compiled = new WebAssembly.Module(wasm);
+  const compiled = await compileV2([commands]);
   const instance = new WebAssembly.Instance(compiled, imports);
 
   const e = instance.exports as any;
@@ -154,7 +141,7 @@ test("pointer, this, that", () => {
   expect(buf[3046]).toBe(46);
 });
 
-test("temp", () => {
+test.only("temp", async () => {
   const commands = parse(`
     function test 0
       push constant 1
@@ -194,18 +181,14 @@ test("temp", () => {
   const mem = new WebAssembly.Memory({ initial: 2, maximum: 2 });
   const imports = { js: { mem } };
 
-  const m = compile([commands]);
-  expect(m.validate()).not.toBe(0);
-
-  const wasm = m.emitBinary();
-  const compiled = new WebAssembly.Module(wasm);
+  const compiled = await compileV2([commands]);
   const instance = new WebAssembly.Instance(compiled, imports);
 
   const e = instance.exports as any;
   expect(e.test()).toBe(36);
 });
 
-test("static", () => {
+test.only("static", async () => {
   const commands = parse(`
     function test 0
       push constant 1
@@ -221,18 +204,14 @@ test("static", () => {
   const mem = new WebAssembly.Memory({ initial: 2, maximum: 2 });
   const imports = { js: { mem } };
 
-  const m = compile([commands]);
-  expect(m.validate()).not.toBe(0);
-
-  const wasm = m.emitBinary();
-  const compiled = new WebAssembly.Module(wasm);
+  const compiled = await compileV2([commands]);
   const instance = new WebAssembly.Instance(compiled, imports);
 
   const e = instance.exports as any;
   expect(e.test()).toBe(42);
 });
 
-test("simple function", () => {
+test.only("simple function", async () => {
   const commands = parse(`
     function f1 0
       push argument 0
@@ -256,18 +235,14 @@ test("simple function", () => {
   const mem = new WebAssembly.Memory({ initial: 2, maximum: 2 });
   const imports = { js: { mem } };
 
-  const m = compile([commands]);
-  expect(m.validate()).not.toBe(0);
-
-  const wasm = m.emitBinary();
-  const compiled = new WebAssembly.Module(wasm);
+  const compiled = await compileV2([commands]);
   const instance = new WebAssembly.Instance(compiled, imports);
 
   const e = instance.exports as any;
   expect(e.test()).toBe(42);
 });
 
-test("multiple static", () => {
+test.only("multiple static", async () => {
   const class1 = parse(`
     function Class1.set 0
     push argument 0
@@ -319,11 +294,7 @@ test("multiple static", () => {
   const mem = new WebAssembly.Memory({ initial: 2, maximum: 2 });
   const imports = { js: { mem } };
 
-  const m = compile([class1, class2, sys]);
-  expect(m.validate()).not.toBe(0);
-
-  const wasm = m.emitBinary();
-  const compiled = new WebAssembly.Module(wasm);
+  const compiled = await compileV2([class1, class2, sys]);
   const instance = new WebAssembly.Instance(compiled, imports);
 
   const e = instance.exports as any;

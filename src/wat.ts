@@ -28,6 +28,12 @@ const wat = {
     or: () => "i32.or",
     xor: () => "i32.xor",
     mul: () => "i32.mul",
+    load: (offset: number) => `i32.load offset=${offset}`,
+    store: (offset: number) => `i32.store offset=${offset}`,
+  },
+  global: {
+    get: (name: string) => `global.get ${name}`,
+    set: (name: string) => `global.set ${name}`,
   },
   br: (n: number) => `br ${n}`,
   br_if: (n: number) => `br_if ${n}`,
