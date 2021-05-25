@@ -553,3 +553,39 @@ test("fibonacci", () => {
   const e = instance.exports as any;
   expect(e["Sys.init"]()).toBe(3);
 });
+
+xtest("r = 8000; r[0] = 2 + 3", () => {
+  const commands = parse(
+    `
+    function Main.main 1
+    push constant 8000
+    pop local 0
+    push constant 2
+    push constant 3
+    add
+    push local 0
+    push constant 0
+    add
+    pop pointer 1
+    pop that 0
+    push constant 0
+    return
+    `
+  );
+
+  const m = compile([commands]);
+  expect(m.validate()).not.toBe(0);
+
+  const mem = new WebAssembly.Memory({ initial: 2, maximum: 2 });
+  const imports = { js: { mem } };
+
+  const wasm = m.emitBinary();
+  const compiled = new WebAssembly.Module(wasm);
+  const instance = new WebAssembly.Instance(compiled, imports);
+
+  const e = instance.exports as any;
+  expect(e["Main.main"]()).toBe(0);
+
+  const buf = new Int32Array(mem.buffer);
+  expect(buf[8000]).toBe(5);
+});
