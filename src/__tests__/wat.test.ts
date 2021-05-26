@@ -19,7 +19,7 @@ test("simple wasm", async () => {
       wat.local.set(j),
 
       wat.block([
-        wat.loop([
+        wat.loop("$LOOP", [
           wat.local.get(j),
           wat.i32.const(0),
           wat.i32.eq(),

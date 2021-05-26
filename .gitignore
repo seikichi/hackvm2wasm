@@ -3,3 +3,9 @@
 
 # Node
 node_modules
+
+# VSCode
+.vscode
+
+# Other
+tmp

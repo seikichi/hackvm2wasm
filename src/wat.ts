@@ -15,7 +15,7 @@ const wat = {
     return local;
   })(),
   block: (ins: string[]) => `block ${ins.join(" ")} end`,
-  loop: (ins: string[]) => `loop ${ins.join(" ")} end`,
+  loop: (name: string, ins: string[]) => `loop ${name} ${ins.join(" ")} end`,
   if: (ins: string[]) => `if ${ins.join(" ")} end`,
   i32: {
     const: (n: number) => `i32.const ${n}`,
@@ -35,8 +35,9 @@ const wat = {
     get: (name: string) => `global.get ${name}`,
     set: (name: string) => `global.set ${name}`,
   },
-  br: (n: number) => `br ${n}`,
+  br: (n: number | string) => `br ${n}`,
   br_if: (n: number) => `br_if ${n}`,
+  br_table: (ns: number[]) => `br_table ${ns.join(" ")}`,
   return: () => `return`,
   call: (name: string) => `call ${name}`,
   select: () => `select`,
