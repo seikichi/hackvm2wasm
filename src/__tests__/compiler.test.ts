@@ -1,6 +1,14 @@
 import { compile } from "../compiler";
 import { parse } from "../hackvm";
 
+let imports: { js: { mem: WebAssembly.Memory; sleep: (_ms: number) => void } };
+
+beforeEach(() => {
+  const mem = new WebAssembly.Memory({ initial: 2, maximum: 2 });
+  const sleep = (_ms: number) => {};
+  imports = { js: { mem, sleep } };
+});
+
 test("simple add", async () => {
   const commands = parse(`
     function test 0
@@ -11,10 +19,6 @@ test("simple add", async () => {
     `);
 
   const compiled = await compile([commands]);
-
-  const mem = new WebAssembly.Memory({ initial: 2, maximum: 2 });
-  const imports = { js: { mem } };
-
   const instance = new WebAssembly.Instance(compiled, imports);
 
   const e = instance.exports as any;
@@ -31,10 +35,6 @@ test("simple comparison", async () => {
     `);
 
   const compiled = await compile([commands]);
-
-  const mem = new WebAssembly.Memory({ initial: 2, maximum: 2 });
-  const imports = { js: { mem } };
-
   const instance = new WebAssembly.Instance(compiled, imports);
 
   const e = instance.exports as any;
@@ -59,10 +59,6 @@ test("simple arithmetic", async () => {
     `);
 
   const compiled = await compile([commands]);
-
-  const mem = new WebAssembly.Memory({ initial: 2, maximum: 2 });
-  const imports = { js: { mem } };
-
   const instance = new WebAssembly.Instance(compiled, imports);
 
   const e = instance.exports as any;
@@ -93,10 +89,6 @@ test("local and argument", async () => {
     `);
 
   const compiled = await compile([commands]);
-
-  const mem = new WebAssembly.Memory({ initial: 2, maximum: 2 });
-  const imports = { js: { mem } };
-
   const instance = new WebAssembly.Instance(compiled, imports);
 
   const e = instance.exports as any;
@@ -124,17 +116,13 @@ test("pointer, this, that", async () => {
       return
     `);
 
-  const mem = new WebAssembly.Memory({ initial: 2, maximum: 2 });
-  const imports = { js: { mem } };
-
   const compiled = await compile([commands]);
   const instance = new WebAssembly.Instance(compiled, imports);
 
   const e = instance.exports as any;
   expect(e.test()).toBe(6084);
 
-  const buf = new Int32Array(mem.buffer);
-  expect(buf.length).toBe(32768);
+  const buf = new Int16Array(imports.js.mem.buffer);
   expect(buf[3032]).toBe(32);
   expect(buf[3046]).toBe(46);
 });
@@ -176,9 +164,6 @@ test("temp", async () => {
       return
     `);
 
-  const mem = new WebAssembly.Memory({ initial: 2, maximum: 2 });
-  const imports = { js: { mem } };
-
   const compiled = await compile([commands]);
   const instance = new WebAssembly.Instance(compiled, imports);
 
@@ -198,9 +183,6 @@ test("static", async () => {
       add
       return
     `);
-
-  const mem = new WebAssembly.Memory({ initial: 2, maximum: 2 });
-  const imports = { js: { mem } };
 
   const compiled = await compile([commands]);
   const instance = new WebAssembly.Instance(compiled, imports);
@@ -229,9 +211,6 @@ test("simple function", async () => {
       call f2 2
       return
     `);
-
-  const mem = new WebAssembly.Memory({ initial: 2, maximum: 2 });
-  const imports = { js: { mem } };
 
   const compiled = await compile([commands]);
   const instance = new WebAssembly.Instance(compiled, imports);
@@ -289,9 +268,6 @@ test("multiple static", async () => {
     return
   `);
 
-  const mem = new WebAssembly.Memory({ initial: 2, maximum: 2 });
-  const imports = { js: { mem } };
-
   const compiled = await compile([class1, class2, sys]);
   const instance = new WebAssembly.Instance(compiled, imports);
 
@@ -328,9 +304,6 @@ test("label, goto, if-goto: mult", async () => {
       return
     `);
 
-  const mem = new WebAssembly.Memory({ initial: 2, maximum: 2 });
-  const imports = { js: { mem } };
-
   const compiled = await compile([commands]);
   const instance = new WebAssembly.Instance(compiled, imports);
 
@@ -362,9 +335,6 @@ test("basic loop", async () => {
       push local 0
       return
     `);
-
-  const mem = new WebAssembly.Memory({ initial: 2, maximum: 2 });
-  const imports = { js: { mem } };
 
   const compiled = await compile([commands]);
   const instance = new WebAssembly.Instance(compiled, imports);
@@ -411,9 +381,6 @@ test("nested call", async () => {
     return
     `);
 
-  const mem = new WebAssembly.Memory({ initial: 2, maximum: 2 });
-  const imports = { js: { mem } };
-
   const compiled = await compile([commands]);
   const instance = new WebAssembly.Instance(compiled, imports);
 
@@ -451,9 +418,6 @@ test("fibonacci", async () => {
   return
   `);
 
-  const mem = new WebAssembly.Memory({ initial: 2, maximum: 2 });
-  const imports = { js: { mem } };
-
   const compiled = await compile([main, sys]);
   const instance = new WebAssembly.Instance(compiled, imports);
 
@@ -480,15 +444,12 @@ test("r = 8000; r[0] = 2 + 3", async () => {
     `
   );
 
-  const mem = new WebAssembly.Memory({ initial: 2, maximum: 2 });
-  const imports = { js: { mem } };
-
   const compiled = await compile([commands]);
   const instance = new WebAssembly.Instance(compiled, imports);
 
   const e = instance.exports as any;
   expect(e["Main.main"]()).toBe(0);
 
-  const buf = new Int32Array(mem.buffer);
+  const buf = new Int16Array(imports.js.mem.buffer);
   expect(buf[8000]).toBe(5);
 });

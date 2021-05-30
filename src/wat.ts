@@ -30,6 +30,8 @@ const wat = {
     mul: () => "i32.mul",
     load: (offset: number) => `i32.load offset=${offset}`,
     store: (offset: number) => `i32.store offset=${offset}`,
+    load16_s: (offset: number) => `i32.load16_s offset=${offset}`,
+    store16: (offset: number) => `i32.store16 offset=${offset}`,
   },
   global: {
     get: (name: string) => `global.get ${name}`,

@@ -13,6 +13,7 @@ interface FunctionOption {
 export async function compile(programs: Command[][]) {
   const m = wat.module([
     wat.import("js", "mem", wat.memory(2, 2)),
+    wat.import("js", "sleep", "(func $sleep (param i32))"),
     ...new Array(8)
       .fill(0)
       .map((_, i) => `(global $temp${i} (mut i32) (i32.const 0))`), // FIXME
@@ -21,6 +22,22 @@ export async function compile(programs: Command[][]) {
   const w = await wabt();
   const module = w.parseWat("HACKVM", m, { mutable_globals: true });
   return new WebAssembly.Module(module.toBinary({}).buffer);
+}
+
+export async function compileToBinary(
+  programs: Command[][]
+): Promise<Uint8Array> {
+  const m = wat.module([
+    wat.import("js", "mem", wat.memory(2, 2)),
+    wat.import("js", "sleep", "(func $sleep (param i32))"),
+    ...new Array(8)
+      .fill(0)
+      .map((_, i) => `(global $temp${i} (mut i32) (i32.const 0))`), // FIXME
+    ...programs.flatMap((p, i) => compileProgram(p, i)),
+  ]);
+  const w = await wabt();
+  const module = w.parseWat("HACKVM", m, { mutable_globals: true });
+  return module.toBinary({}).buffer;
 }
 
 function compileProgram(program: Command[], id: number): string[] {
@@ -177,16 +194,16 @@ function compileBlock(
             results.push(wat.local.get(index));
             break;
           case "this":
-            results.push(wat.i32.const(4));
+            results.push(wat.i32.const(2));
             results.push(wat.local.get(thisIndex));
             results.push(wat.i32.mul());
-            results.push(wat.i32.load(4 * c.args[1]));
+            results.push(wat.i32.load16_s(2 * c.args[1]));
             break;
           case "that":
-            results.push(wat.i32.const(4));
+            results.push(wat.i32.const(2));
             results.push(wat.local.get(thatIndex));
             results.push(wat.i32.mul());
-            results.push(wat.i32.load(4 * c.args[1]));
+            results.push(wat.i32.load16_s(2 * c.args[1]));
             break;
           case "temp":
             results.push(wat.global.get(`$temp${c.args[1]}`));
@@ -214,19 +231,19 @@ function compileBlock(
             break;
           case "this":
             results.push(wat.local.set(tempLocal));
-            results.push(wat.i32.const(4));
+            results.push(wat.i32.const(2));
             results.push(wat.local.get(thisIndex));
             results.push(wat.i32.mul());
             results.push(wat.local.get(tempLocal));
-            results.push(wat.i32.store(4 * c.args[1]));
+            results.push(wat.i32.store16(2 * c.args[1]));
             break;
           case "that":
             results.push(wat.local.set(tempLocal));
-            results.push(wat.i32.const(4));
+            results.push(wat.i32.const(2));
             results.push(wat.local.get(thatIndex));
             results.push(wat.i32.mul());
             results.push(wat.local.get(tempLocal));
-            results.push(wat.i32.store(4 * c.args[1]));
+            results.push(wat.i32.store16(2 * c.args[1]));
             break;
           case "temp":
             results.push(wat.global.set(`$temp${c.args[1]}`));
